@@ -29,7 +29,7 @@
     "dev": "tsc -p tsconfig.json --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --experimental-strip-types test/*.test.ts"
+    "test": "tsc -p tsconfig.json && node --test --experimental-strip-types test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
