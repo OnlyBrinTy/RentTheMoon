@@ -1,5 +1,6 @@
 node_modules/
 .tooling/
+.pnpm-store/
 dist/
 build/
 out/
