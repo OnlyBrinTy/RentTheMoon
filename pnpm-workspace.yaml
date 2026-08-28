@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "ponder"
+
+onlyBuiltDependencies:
+  - "@parcel/watcher"
+  - "bufferutil"
+  - "esbuild"
+  - "keccak"
+  - "secp256k1"
+  - "sharp"
+  - "utf-8-validate"

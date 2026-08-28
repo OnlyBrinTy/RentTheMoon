@@ -1,0 +1,25 @@
+{
+  "name": "lunarlease",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LunarLease — decentralized virtual lunar sector ownership and rental on Polygon",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "build:shared": "pnpm --filter @lunarlease/shared build",
+    "test": "pnpm -r test",
+    "test:contracts": "pnpm --filter @lunarlease/contracts test",
+    "dev": "pnpm --filter @lunarlease/web dev",
+    "chain": "pnpm --filter @lunarlease/contracts chain",
+    "deploy:local": "pnpm --filter @lunarlease/contracts deploy:local",
+    "deploy:amoy": "pnpm --filter @lunarlease/contracts deploy:amoy",
+    "ponder:dev": "pnpm --filter @lunarlease/ponder dev",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
