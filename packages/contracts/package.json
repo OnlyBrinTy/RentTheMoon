@@ -1,0 +1,39 @@
+{
+  "name": "@lunarlease/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./abi": "./abi/index.ts",
+    "./deployments/*": "./deployments/*"
+  },
+  "files": ["abi", "artifacts", "contracts", "deployments"],
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "chain": "hardhat node",
+    "clean": "hardhat clean && rm -rf types",
+    "deploy:local": "hardhat ignition deploy ignition/modules/LunarLease.ts --network localhost && node scripts/postDeploy.ts 31337",
+    "deploy:amoy": "hardhat ignition deploy ignition/modules/LunarLease.ts --network amoy && node scripts/postDeploy.ts 80002",
+    "typecheck": "hardhat compile && tsc --noEmit"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.0",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.7",
+    "@types/chai": "^5.2.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.5",
+    "chai": "^5.2.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.14.0",
+    "hardhat": "^3.15.0",
+    "mocha": "^11.0.0",
+    "typescript": "^5.7.3"
+  }
+}
