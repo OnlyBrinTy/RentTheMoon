@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #04060f;
+  --color-deep: #070c19;
+  --color-panel: #0b1122;
+  --color-panel-raised: #101830;
+  --color-hairline: #1a2440;
+  --color-hairline-strong: #263352;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --animate-pulse-soft: pulse-soft 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-rise: rise 0.28s ease-out both;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: color-mix(in oklab, white 92%, transparent);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, #38bdf8 40%, transparent);
+  }
+}
+
+@utility starfield {
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.09), transparent 42%),
+    radial-gradient(circle at 82% 8%, rgba(168, 85, 247, 0.08), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(30, 64, 175, 0.12), transparent 55%);
+}
+
+@utility panel-surface {
+  background-color: color-mix(in oklab, var(--color-panel) 88%, transparent);
+  border: 1px solid var(--color-hairline);
+  backdrop-filter: blur(12px);
+}
+
+@utility numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+@utility scrollbar-thin-dark {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-strong) transparent;
+}
