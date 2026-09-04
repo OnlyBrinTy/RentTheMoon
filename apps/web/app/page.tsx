@@ -7,7 +7,6 @@ import { useAllSectors } from "@/hooks/use-sector-scan";
 import { contractsConfigured } from "@/lib/config";
 import { MoonViewer } from "@/components/moon/moon-viewer";
 import { SectorPanel } from "@/components/sector/sector-panel";
-import { WithdrawIncomeCard } from "@/components/sector/withdraw-income-card";
 import { ContractsNotConfigured } from "@/components/ui/contracts-not-configured";
 
 export default function HomePage() {
@@ -74,7 +73,6 @@ export default function HomePage() {
 
         <aside className="scrollbar-thin-dark flex flex-col gap-4 lg:max-h-[calc(100dvh-13rem)] lg:overflow-y-auto lg:pr-1">
           <SectorPanel sectorId={selectedSectorId} />
-          <WithdrawIncomeCard />
         </aside>
       </div>
     </div>

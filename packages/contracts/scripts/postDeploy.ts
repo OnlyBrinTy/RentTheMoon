@@ -8,6 +8,8 @@ const IGNITION_DEPLOYMENTS = join(packageRoot, "ignition", "deployments");
 const ARTIFACTS = join(packageRoot, "artifacts", "contracts");
 const DEPLOYMENTS_OUT = join(packageRoot, "deployments");
 const ABI_OUT = join(packageRoot, "abi");
+const WEB_ENV = join(packageRoot, "..", "..", "apps", "web", ".env.local");
+const LOCAL_RPC_URL = "http://127.0.0.1:8545";
 
 const REGISTRY_FUTURE = "LunarLease#MoonLandRegistry";
 const MARKETPLACE_FUTURE = "LunarLease#MoonMarketplace";
@@ -80,6 +82,31 @@ function writeAbiIndex(): string {
   return target;
 }
 
+function writeWebEnv(chainId: string, registry: string, marketplace: string): string {
+  const vars = new Map<string, string>();
+
+  if (existsSync(WEB_ENV)) {
+    for (const line of readFileSync(WEB_ENV, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const separator = trimmed.indexOf("=");
+      if (separator === -1) continue;
+      vars.set(trimmed.slice(0, separator), trimmed.slice(separator + 1));
+    }
+  }
+
+  vars.set("NEXT_PUBLIC_CHAIN_ID", chainId);
+  vars.set("NEXT_PUBLIC_REGISTRY_ADDRESS", registry);
+  vars.set("NEXT_PUBLIC_MARKETPLACE_ADDRESS", marketplace);
+  if (chainId === "31337") {
+    vars.set("NEXT_PUBLIC_RPC_URL", LOCAL_RPC_URL);
+  }
+
+  const body = `${[...vars.entries()].map(([key, value]) => `${key}=${value}`).join("\n")}\n`;
+  writeFileSync(WEB_ENV, body);
+  return WEB_ENV;
+}
+
 function main(): void {
   const chainId = resolveChainId();
   const addresses = readDeployedAddresses(chainId);
@@ -99,6 +126,7 @@ function main(): void {
   const registryAbiFile = writeAbiModule("registry.ts", "moonLandRegistryAbi", readAbi("MoonLandRegistry"));
   const marketplaceAbiFile = writeAbiModule("marketplace.ts", "moonMarketplaceAbi", readAbi("MoonMarketplace"));
   const indexFile = writeAbiIndex();
+  const webEnvFile = writeWebEnv(chainId, registry, marketplace);
 
   console.log(`chainId      ${chainId}`);
   console.log(`registry     ${registry}`);
@@ -107,6 +135,7 @@ function main(): void {
   console.log(`wrote        ${registryAbiFile}`);
   console.log(`wrote        ${marketplaceAbiFile}`);
   console.log(`wrote        ${indexFile}`);
+  console.log(`wrote        ${webEnvFile}`);
 }
 
 main();

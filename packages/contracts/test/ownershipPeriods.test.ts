@@ -1,6 +1,13 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { SECTOR_A, SECTOR_B, deployLunarLease, ethers, networkHelpers } from "./helpers.js";
+import {
+  SECTOR_A,
+  SECTOR_B,
+  deployLunarLease,
+  ethers,
+  firstOf,
+  networkHelpers,
+} from "./helpers.js";
 
 const TOP_UP = ethers.parseEther("1");
 const PRICE_PER_DAY = ethers.parseEther("0.01");
@@ -41,8 +48,8 @@ describe("MoonLandRegistry — ownership periods", () => {
     const periods = await registry.getOwnershipPeriods(alice.address);
 
     expect(periods.length).to.equal(1);
-    expect(periods[0].expiry).to.equal(NO_EXPIRY);
-    expect(periods[0].start).to.equal(BigInt(await networkHelpers.time.latest()));
+    expect(firstOf(periods).expiry).to.equal(NO_EXPIRY);
+    expect(firstOf(periods).start).to.equal(BigInt(await networkHelpers.time.latest()));
     expect(await registry.num_owned_sectors(alice.address)).to.equal(1n);
   });
 
@@ -68,7 +75,7 @@ describe("MoonLandRegistry — ownership periods", () => {
     const bought = await registry.getOwnershipPeriods(bob.address);
 
     expect(bought.length).to.equal(1);
-    expect(bought[0].expiry).to.equal(NO_EXPIRY);
+    expect(firstOf(bought).expiry).to.equal(NO_EXPIRY);
     expect(await registry.num_owned_sectors(bob.address)).to.equal(1n);
   });
 
@@ -90,9 +97,11 @@ describe("MoonLandRegistry — ownership periods", () => {
 
     const periods = await registry.getOwnershipPeriods(bob.address);
 
+    const period = firstOf(periods);
+
     expect(periods.length).to.equal(1);
-    expect(periods[0].expiry).to.equal(await registry.userExpires(SECTOR_A));
-    expect(periods[0].expiry - periods[0].start).to.equal(BigInt(5 * ONE_DAY));
+    expect(period.expiry).to.equal(await registry.userExpires(SECTOR_A));
+    expect(period.expiry - period.start).to.equal(BigInt(5 * ONE_DAY));
   });
 
   it("holds one period per concurrently rented sector", async () => {
@@ -125,7 +134,7 @@ describe("MoonLandRegistry — ownership periods", () => {
     const rented = await registry.getOwnershipPeriods(bob.address);
 
     expect(rented.length).to.equal(1);
-    expect(rented[0].expiry).to.equal(liveExpiry);
+    expect(firstOf(rented).expiry).to.equal(liveExpiry);
     expect((await registry.getOwnershipPeriods(alice.address)).length).to.equal(2);
   });
 

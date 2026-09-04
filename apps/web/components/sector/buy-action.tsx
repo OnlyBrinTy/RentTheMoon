@@ -4,7 +4,8 @@ import type { SectorChainState } from "@lunarlease/shared";
 import { splitPlatformFee } from "@lunarlease/shared";
 import { usePlatformFeeBps } from "@/hooks/use-marketplace-info";
 import { useBuyListedSector } from "@/hooks/use-sector-writes";
-import { formatPercentFromBps, formatPrice } from "@/lib/format";
+import { formatMun, formatPercentFromBps } from "@/lib/format";
+import { MunBalanceNotice } from "@/components/mun/mun-balance-notice";
 import { Button } from "@/components/ui/button";
 import { LegalNoticeCallout } from "@/components/ui/legal-notice";
 import { TransactionStatus } from "@/components/ui/transaction-status";
@@ -21,12 +22,12 @@ export function BuyAction({ sector }: { readonly sector: SectorChainState }) {
   return (
     <ActionShell
       title="Buy this sector"
-      description="Secondary market purchase. The ERC-721 token transfers to you and any rental user is cleared."
+      description="Secondary market purchase, settled from your MUN balance. The ERC-721 token transfers to you and any rental user is cleared."
     >
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-xs text-white/45">Listing price</span>
         <span className="numeric text-lg font-semibold text-amber-200">
-          {formatPrice(sector.salePrice, 6)}
+          {formatMun(sector.salePrice, 6)}
         </span>
       </div>
 
@@ -35,9 +36,11 @@ export function BuyAction({ sector }: { readonly sector: SectorChainState }) {
           Platform fee ({formatPercentFromBps(feeBps)})
         </span>
         <span className="numeric text-[11px] text-white/50">
-          {formatPrice(split.platformFee, 6)}
+          {formatMun(split.platformFee, 6)}
         </span>
       </div>
+
+      <MunBalanceNotice required={sector.salePrice} />
 
       <LegalNoticeCallout />
 

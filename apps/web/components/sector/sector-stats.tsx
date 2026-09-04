@@ -9,7 +9,7 @@ import {
   type SectorChainState,
 } from "@lunarlease/shared";
 import { useNow } from "@/hooks/use-now";
-import { formatPrice } from "@/lib/format";
+import { formatMun } from "@/lib/format";
 import { DataList, DataRow } from "@/components/ui/data-row";
 import { SectorStateBadge } from "@/components/ui/badge";
 import { AddressDisplay } from "./address-display";
@@ -49,7 +49,7 @@ export function SectorStats({ sector }: { readonly sector: SectorChainState }) {
       </DataRow>
       <DataRow label="Rental price">
         {sector.pricePerDay > 0n ? (
-          <span className="numeric">{formatPrice(sector.pricePerDay)} / day</span>
+          <span className="numeric">{formatMun(sector.pricePerDay)} / day</span>
         ) : (
           <span className="text-white/35">not set</span>
         )}
@@ -75,7 +75,7 @@ export function SectorStats({ sector }: { readonly sector: SectorChainState }) {
       </DataRow>
       <DataRow label="Sale price">
         {sector.saleEnabled && sector.salePrice > 0n ? (
-          <span className="numeric text-amber-200">{formatPrice(sector.salePrice)}</span>
+          <span className="numeric text-amber-200">{formatMun(sector.salePrice)}</span>
         ) : (
           <span className="text-white/35">not listed</span>
         )}

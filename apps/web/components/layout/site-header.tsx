@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@/components/wallet/connect-button";
+import { MunBalanceBadge } from "@/components/wallet/mun-balance-badge";
 
 const navigation = [
   { href: "/", label: "Moon" },
   { href: "/marketplace", label: "Marketplace" },
   { href: "/my-land", label: "My Land" },
   { href: "/my-rentals", label: "My Rentals" },
+  { href: "/wallet", label: "Wallet" },
 ] as const;
 
 export function SiteHeader() {
@@ -55,6 +57,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <MunBalanceBadge />
           <ConnectButton />
         </div>
       </div>

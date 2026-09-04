@@ -5,7 +5,6 @@ import { useOwnedSectors } from "@/hooks/use-sector-scan";
 import { contractsConfigured } from "@/lib/config";
 import { PageShell } from "@/components/layout/page-shell";
 import { SectorCardGrid } from "@/components/sector/sector-card";
-import { WithdrawIncomeCard } from "@/components/sector/withdraw-income-card";
 import { ContractsNotConfigured } from "@/components/ui/contracts-not-configured";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCardGrid } from "@/components/ui/skeleton";
@@ -40,20 +39,12 @@ export function MyLandView() {
       ) : matches !== undefined && matches.length > 0 ? (
         <div className="space-y-6">
           <SectorCardGrid sectors={matches} />
-          <div className="max-w-md">
-            <WithdrawIncomeCard />
-          </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          <EmptyState
-            title="You do not own any sectors yet"
-            description="Head to the Moon, pick an unclaimed sector, and acquire it to start earning rental income."
-          />
-          <div className="max-w-md">
-            <WithdrawIncomeCard />
-          </div>
-        </div>
+        <EmptyState
+          title="You do not own any sectors yet"
+          description="Head to the Moon, pick an unclaimed sector, and acquire it to start earning rental income."
+        />
       )}
     </PageShell>
   );

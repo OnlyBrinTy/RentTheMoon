@@ -7,10 +7,10 @@ import {
   ERC721_ENUMERABLE_INTERFACE_ID,
   ERC721_INTERFACE_ID,
   ERC721_METADATA_INTERFACE_ID,
-  INITIAL_SECTOR_PRICE,
   SECTOR_A,
   TOTAL_SECTORS,
   ZERO_ADDRESS,
+  deployFunded,
   deployLunarLease,
   deployWithOwnedSector,
   networkHelpers,
@@ -73,11 +73,10 @@ describe("MoonLandRegistry", () => {
   });
 
   it("renders the zero meridian and equator without a hemisphere suffix", async () => {
-    const { marketplace, registry, alice } =
-      await networkHelpers.loadFixture(deployLunarLease);
+    const { marketplace, registry, alice } = await networkHelpers.loadFixture(deployFunded);
 
     const sectorId = 1_332n;
-    await marketplace.connect(alice).acquireSector(sectorId, { value: INITIAL_SECTOR_PRICE });
+    await marketplace.connect(alice).acquireSector(sectorId);
 
     const metadata = decodeTokenUri(await registry.tokenURI(sectorId));
 

@@ -8,7 +8,7 @@ import {
   type SectorChainState,
 } from "@lunarlease/shared";
 import { useNow } from "@/hooks/use-now";
-import { formatPrice } from "@/lib/format";
+import { formatMun } from "@/lib/format";
 import { sectorVisualStyles } from "@/lib/sector-visuals";
 import { SectorStateBadge } from "@/components/ui/badge";
 import { ExpiryCountdown } from "./expiry-countdown";
@@ -47,14 +47,14 @@ export function SectorCard({ sector }: { readonly sector: SectorChainState }) {
           <div className="flex items-center justify-between gap-3">
             <dt className="text-white/40">Rent</dt>
             <dd className="numeric text-white/80">
-              {formatPrice(sector.pricePerDay)} / day
+              {formatMun(sector.pricePerDay)} / day
             </dd>
           </div>
         ) : null}
         {sector.saleEnabled && sector.salePrice > 0n ? (
           <div className="flex items-center justify-between gap-3">
             <dt className="text-white/40">Sale</dt>
-            <dd className="numeric text-amber-200">{formatPrice(sector.salePrice)}</dd>
+            <dd className="numeric text-amber-200">{formatMun(sector.salePrice)}</dd>
           </div>
         ) : null}
         {rentalActive ? (

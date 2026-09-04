@@ -82,6 +82,30 @@ export const moonLandRegistryAbi = [
   },
   {
     type: "function",
+    name: "getOwnershipPeriods",
+    stateMutability: "view",
+    inputs: [{ name: "holder", type: "address", internalType: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        internalType: "struct IMoonLandRegistry.OwnershipPeriod[]",
+        components: [
+          { name: "start", type: "uint64", internalType: "uint64" },
+          { name: "expiry", type: "uint64", internalType: "uint64" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "cleanExpiredPeriods",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "holder", type: "address", internalType: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "ownerOf",
     stateMutability: "view",
     inputs: [{ name: "tokenId", type: "uint256", internalType: "uint256" }],

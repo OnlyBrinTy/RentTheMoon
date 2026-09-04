@@ -14,10 +14,11 @@ import { usePlatformFeeBps } from "@/hooks/use-marketplace-info";
 import { useRentSector } from "@/hooks/use-sector-writes";
 import {
   formatPercentFromBps,
-  formatPrice,
+  formatMun,
   formatUnixTimestamp,
   tryParseDayCount,
 } from "@/lib/format";
+import { MunBalanceNotice } from "@/components/mun/mun-balance-notice";
 import { Button } from "@/components/ui/button";
 import { LabeledInput } from "@/components/ui/labeled-input";
 import { LegalNoticeCallout } from "@/components/ui/legal-notice";
@@ -55,12 +56,12 @@ export function RentAction({ sector }: { readonly sector: SectorChainState }) {
   return (
     <ActionShell
       title="Rent this sector"
-      description="Renting grants you ERC-4907 usage rights for the chosen period. Ownership stays with the owner."
+      description="Renting grants you ERC-4907 usage rights for the chosen period and debits your MUN balance. Ownership stays with the owner."
     >
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-xs text-white/45">Price per day</span>
         <span className="numeric text-sm font-semibold text-white">
-          {formatPrice(sector.pricePerDay)}
+          {formatMun(sector.pricePerDay)}
         </span>
       </div>
 
@@ -78,7 +79,7 @@ export function RentAction({ sector }: { readonly sector: SectorChainState }) {
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-xs text-white/45">Total</span>
           <span className="numeric text-base font-semibold text-sky-200">
-            {totalPrice === undefined ? "—" : formatPrice(totalPrice, 6)}
+            {totalPrice === undefined ? "—" : formatMun(totalPrice, 6)}
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-4">
@@ -86,13 +87,13 @@ export function RentAction({ sector }: { readonly sector: SectorChainState }) {
             Platform fee ({formatPercentFromBps(feeBps)})
           </span>
           <span className="numeric text-[11px] text-white/50">
-            {split === undefined ? "—" : formatPrice(split.platformFee, 6)}
+            {split === undefined ? "—" : formatMun(split.platformFee, 6)}
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-[11px] text-white/35">To sector owner</span>
           <span className="numeric text-[11px] text-white/50">
-            {split === undefined ? "—" : formatPrice(split.sellerProceeds, 6)}
+            {split === undefined ? "—" : formatMun(split.sellerProceeds, 6)}
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-4 border-t border-white/5 pt-1.5">
@@ -102,6 +103,8 @@ export function RentAction({ sector }: { readonly sector: SectorChainState }) {
           </span>
         </div>
       </div>
+
+      <MunBalanceNotice required={totalPrice} />
 
       <LegalNoticeCallout />
 

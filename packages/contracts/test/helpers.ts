@@ -13,6 +13,9 @@ export const INITIAL_SECTOR_PRICE = 100_000_000_000_000_000n;
 export const PLATFORM_FEE_BPS = 300n;
 export const BPS_DENOMINATOR = 10_000n;
 export const SECONDS_PER_DAY = 86_400n;
+export const MUN_TO_ETH_RATE = 10n;
+export const TOP_UP_MUN = 100_000_000_000_000_000_000n;
+export const TOP_UP_VALUE = TOP_UP_MUN / MUN_TO_ETH_RATE;
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export const ERC4907_INTERFACE_ID = "0xad092b5c";
@@ -32,6 +35,16 @@ export function beneficiaryShareOf(total: bigint): bigint {
   return total - platformFeeOf(total);
 }
 
+export function firstOf<T>(items: readonly T[]): T {
+  const [first] = items;
+  if (first === undefined) throw new Error("Expected at least one entry.");
+  return first;
+}
+
+export function valueForMUN(amountMUN: bigint): bigint {
+  return (amountMUN + MUN_TO_ETH_RATE - 1n) / MUN_TO_ETH_RATE;
+}
+
 async function namedAccounts() {
   const signers = await ethers.getSigners();
   const [admin, alice, bob, carol, treasury] = signers;
@@ -49,16 +62,30 @@ async function namedAccounts() {
   return { admin, alice, bob, carol, treasury };
 }
 
+export type NamedSigner = Awaited<ReturnType<typeof namedAccounts>>["alice"];
+
 export interface LunarLeaseDeployment {
   registry: MoonLandRegistry;
   marketplace: MoonMarketplace;
   registryAddress: string;
   marketplaceAddress: string;
-  admin: Awaited<ReturnType<typeof namedAccounts>>["admin"];
-  alice: Awaited<ReturnType<typeof namedAccounts>>["alice"];
-  bob: Awaited<ReturnType<typeof namedAccounts>>["bob"];
-  carol: Awaited<ReturnType<typeof namedAccounts>>["carol"];
-  treasury: Awaited<ReturnType<typeof namedAccounts>>["treasury"];
+  admin: NamedSigner;
+  alice: NamedSigner;
+  bob: NamedSigner;
+  carol: NamedSigner;
+  treasury: NamedSigner;
+}
+
+export async function fundMUN(
+  marketplace: MoonMarketplace,
+  account: NamedSigner,
+  amountMUN: bigint,
+): Promise<bigint> {
+  const value = valueForMUN(amountMUN);
+
+  await marketplace.connect(account).popUpBalance(account.address, { value });
+
+  return value * MUN_TO_ETH_RATE;
 }
 
 export async function deployLunarLease(): Promise<LunarLeaseDeployment> {
@@ -89,12 +116,20 @@ export async function deployLunarLease(): Promise<LunarLeaseDeployment> {
   };
 }
 
-export async function deployWithOwnedSector(): Promise<LunarLeaseDeployment> {
+export async function deployFunded(): Promise<LunarLeaseDeployment> {
   const deployment = await deployLunarLease();
 
-  await deployment.marketplace
-    .connect(deployment.alice)
-    .acquireSector(SECTOR_A, { value: INITIAL_SECTOR_PRICE });
+  for (const account of [deployment.alice, deployment.bob, deployment.carol]) {
+    await fundMUN(deployment.marketplace, account, TOP_UP_MUN);
+  }
+
+  return deployment;
+}
+
+export async function deployWithOwnedSector(): Promise<LunarLeaseDeployment> {
+  const deployment = await deployFunded();
+
+  await deployment.marketplace.connect(deployment.alice).acquireSector(SECTOR_A);
 
   return deployment;
 }

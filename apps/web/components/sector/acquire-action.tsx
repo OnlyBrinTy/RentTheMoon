@@ -2,7 +2,8 @@
 
 import { useInitialSectorPrice } from "@/hooks/use-marketplace-info";
 import { useAcquireSector } from "@/hooks/use-sector-writes";
-import { formatPrice } from "@/lib/format";
+import { formatMun } from "@/lib/format";
+import { MunBalanceNotice } from "@/components/mun/mun-balance-notice";
 import { Button } from "@/components/ui/button";
 import { LegalNoticeCallout } from "@/components/ui/legal-notice";
 import { TransactionStatus } from "@/components/ui/transaction-status";
@@ -17,14 +18,16 @@ export function AcquireAction({ sectorId }: { readonly sectorId: number }) {
   return (
     <ActionShell
       title="Acquire this sector"
-      description="This sector has never been claimed. Acquiring mints the ERC-721 token to your wallet."
+      description="This sector has never been claimed. Acquiring mints the ERC-721 token to your wallet and debits your MUN balance."
     >
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-xs text-white/45">Primary price</span>
         <span className="numeric text-lg font-semibold text-white">
-          {isLoading ? "…" : formatPrice(price)}
+          {isLoading ? "…" : formatMun(price)}
         </span>
       </div>
+
+      <MunBalanceNotice required={price} />
 
       <LegalNoticeCallout />
 

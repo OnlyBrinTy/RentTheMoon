@@ -3,14 +3,18 @@ import { describe, it } from "mocha";
 
 import {
   INITIAL_SECTOR_PRICE,
+  MUN_TO_ETH_RATE,
   SECTOR_A,
   SECTOR_B,
+  deployFunded,
   deployLunarLease,
   ethers,
+  fundMUN,
   networkHelpers,
+  valueForMUN,
 } from "./helpers.js";
 
-const OVERPAYMENT = 1_000_000_000_000_000_000n;
+const ATTACKER_TOP_UP = 1_000_000_000_000_000_000n;
 
 async function deployUnderAttack() {
   const deployment = await deployLunarLease();
@@ -21,68 +25,75 @@ async function deployUnderAttack() {
     deployment.carol,
   );
 
-  await deployment.marketplace
-    .connect(deployment.alice)
-    .acquireSector(SECTOR_B, { value: INITIAL_SECTOR_PRICE });
+  await fundMUN(deployment.marketplace, deployment.alice, INITIAL_SECTOR_PRICE);
+  await deployment.marketplace.connect(deployment.alice).acquireSector(SECTOR_B);
 
-  await attacker.connect(deployment.carol).acquire(SECTOR_A, {
-    value: INITIAL_SECTOR_PRICE + OVERPAYMENT,
-  });
+  await attacker.connect(deployment.carol).acquire(SECTOR_A, { value: ATTACKER_TOP_UP });
 
   return { ...deployment, attacker, attackerAddress: await attacker.getAddress() };
 }
 
-describe("Security — reentrancy on withdrawRentalIncome", () => {
-  it("rejects the re-entrant call and pays the attacker exactly once", async () => {
-    const { marketplace, attacker, attackerAddress, marketplaceAddress } =
+describe("Security — the attacker's funds live in MUN", () => {
+  it("credits the attacker's top-up as MUN", async () => {
+    const { marketplace, registry, attacker, attackerAddress } =
       await networkHelpers.loadFixture(deployUnderAttack);
 
-    const marketplaceBefore = await ethers.provider.getBalance(marketplaceAddress);
-    expect(await marketplace.claimableBalance(attackerAddress)).to.equal(OVERPAYMENT);
+    expect(await registry.ownerOf(SECTOR_A)).to.equal(attackerAddress);
+    expect(await marketplace.getMUNBalance(attackerAddress)).to.equal(
+      ATTACKER_TOP_UP * MUN_TO_ETH_RATE - INITIAL_SECTOR_PRICE,
+    );
+    expect(await attacker.reentryAttempts()).to.equal(0n);
+  });
+});
 
-    await attacker.attack();
+describe("Security — reentrancy on a POL payout", () => {
+  it("rejects the re-entrant call and pays the recipient exactly once", async () => {
+    const { marketplace, admin, attacker, attackerAddress, marketplaceAddress } =
+      await networkHelpers.loadFixture(deployUnderAttack);
+
+    const payout = ATTACKER_TOP_UP / 2n;
+    const heldBefore = await ethers.provider.getBalance(marketplaceAddress);
+    const platformBefore = await marketplace.platformBalance();
+
+    await marketplace.connect(admin).withdrawPlatformFunds(attackerAddress, payout);
 
     expect(await attacker.reentryAttempts()).to.equal(1n);
     expect(await attacker.reentryRejected()).to.equal(true);
 
-    expect(await ethers.provider.getBalance(attackerAddress)).to.equal(OVERPAYMENT);
-    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(
-      marketplaceBefore - OVERPAYMENT,
-    );
-    expect(await marketplace.claimableBalance(attackerAddress)).to.equal(0n);
-    expect(await marketplace.platformBalance()).to.equal(INITIAL_SECTOR_PRICE * 2n);
+    expect(await ethers.provider.getBalance(attackerAddress)).to.equal(payout);
+    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(heldBefore - payout);
+    expect(await marketplace.platformBalance()).to.equal(platformBefore - payout);
   });
 
-  it("reverts the whole withdrawal when the attacker lets the re-entrant revert bubble up", async () => {
-    const { marketplace, attacker, attackerAddress, marketplaceAddress } =
+  it("reverts the whole payout when the attacker lets the re-entrant revert bubble up", async () => {
+    const { marketplace, admin, attacker, attackerAddress, marketplaceAddress } =
       await networkHelpers.loadFixture(deployUnderAttack);
 
     await attacker.setSwallowReentryRevert(false);
 
-    const marketplaceBefore = await ethers.provider.getBalance(marketplaceAddress);
+    const heldBefore = await ethers.provider.getBalance(marketplaceAddress);
+    const platformBefore = await marketplace.platformBalance();
 
-    await expect(attacker.attack()).to.be.revertedWithCustomError(
-      marketplace,
-      "ReentrancyGuardReentrantCall",
-    );
+    await expect(
+      marketplace.connect(admin).withdrawPlatformFunds(attackerAddress, ATTACKER_TOP_UP / 2n),
+    ).to.be.revertedWithCustomError(marketplace, "ReentrancyGuardReentrantCall");
 
-    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(marketplaceBefore);
+    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(heldBefore);
     expect(await ethers.provider.getBalance(attackerAddress)).to.equal(0n);
-    expect(await marketplace.claimableBalance(attackerAddress)).to.equal(OVERPAYMENT);
+    expect(await marketplace.platformBalance()).to.equal(platformBefore);
   });
 
-  it("leaves every other balance untouched after the attack", async () => {
-    const { marketplace, attacker, alice, marketplaceAddress } =
+  it("records every deposited POL as withdrawable platform revenue", async () => {
+    const { marketplace, admin, attacker, attackerAddress, marketplaceAddress } =
       await networkHelpers.loadFixture(deployUnderAttack);
 
-    await attacker.attack();
+    await marketplace.connect(admin).withdrawPlatformFunds(attackerAddress, 1n);
 
-    const solvency =
-      (await marketplace.platformBalance()) + (await marketplace.claimableBalance(alice.address));
     const held = await ethers.provider.getBalance(marketplaceAddress);
 
-    expect(held >= solvency).to.equal(true);
-    expect(held).to.equal(INITIAL_SECTOR_PRICE * 2n);
+    expect(held).to.equal(valueForMUN(INITIAL_SECTOR_PRICE) + ATTACKER_TOP_UP - 1n);
+    expect(await marketplace.platformBalance()).to.equal(held);
+    expect(await attacker.reentryRejected()).to.equal(true);
   });
 });
 
@@ -120,15 +131,15 @@ describe("Security — role boundaries", () => {
   });
 
   it("lets the admin revoke MARKETPLACE_ROLE from a retired marketplace", async () => {
-    const { registry, marketplace, marketplaceAddress, admin, alice } =
-      await networkHelpers.loadFixture(deployLunarLease);
+    const { marketplace, registry, marketplaceAddress, admin, alice } =
+      await networkHelpers.loadFixture(deployFunded);
 
     await registry
       .connect(admin)
       .revokeRole(await registry.MARKETPLACE_ROLE(), marketplaceAddress);
 
     await expect(
-      marketplace.connect(alice).acquireSector(SECTOR_A, { value: INITIAL_SECTOR_PRICE }),
+      marketplace.connect(alice).acquireSector(SECTOR_A),
     ).to.be.revertedWithCustomError(registry, "AccessControlUnauthorizedAccount");
   });
 });

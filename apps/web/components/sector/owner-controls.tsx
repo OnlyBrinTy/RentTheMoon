@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isRentalActive, type SectorChainState } from "@lunarlease/shared";
+import { isRentalActive, MUN_SYMBOL, type SectorChainState } from "@lunarlease/shared";
 import { useNow } from "@/hooks/use-now";
 import {
   useCancelListing,
@@ -9,8 +9,7 @@ import {
   useSetRentEnabled,
   useSetRentalPrice,
 } from "@/hooks/use-sector-writes";
-import { formatPrice, toEtherInputValue, tryParseEther } from "@/lib/format";
-import { nativeCurrencySymbol } from "@/lib/config";
+import { formatMun, toEtherInputValue, tryParseEther } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { LabeledInput } from "@/components/ui/labeled-input";
 import { TransactionStatus } from "@/components/ui/transaction-status";
@@ -33,11 +32,11 @@ function RentalPriceControl({ sector }: { readonly sector: SectorChainState }) {
         placeholder="0.01"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        suffix={nativeCurrencySymbol}
+        suffix={MUN_SYMBOL}
         invalid={value.length > 0 && parsed === undefined}
         hint={
           sector.pricePerDay > 0n
-            ? `Currently ${formatPrice(sector.pricePerDay, 6)} / day`
+            ? `Currently ${formatMun(sector.pricePerDay, 6)} / day`
             : "No rental price set yet."
         }
       />
@@ -107,11 +106,11 @@ function SaleControl({ sector }: { readonly sector: SectorChainState }) {
         placeholder="0.25"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        suffix={nativeCurrencySymbol}
+        suffix={MUN_SYMBOL}
         invalid={value.length > 0 && parsed === undefined}
         hint={
           isListed
-            ? `Listed at ${formatPrice(sector.salePrice, 6)}`
+            ? `Listed at ${formatMun(sector.salePrice, 6)}`
             : "Not currently listed."
         }
       />

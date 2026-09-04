@@ -11,17 +11,7 @@ import {
 } from "./config";
 
 function buildConnectors(): CreateConnectorFn[] {
-  return [
-    injected({
-      shimDisconnect: true,
-      unstable_shimAsyncInject: 2_000,
-      target: () => ({
-        id: "injected",
-        name: "Browser wallet",
-        provider: (walletWindow) => walletWindow?.ethereum,
-      }),
-    }),
-  ];
+  return [injected({ shimDisconnect: true })];
 }
 
 function orderedChains(): readonly [SupportedChain, ...SupportedChain[]] {
@@ -53,5 +43,7 @@ export function getWagmiConfig() {
   cachedConfig ??= buildWagmiConfig();
   return cachedConfig;
 }
+
+export const wagmiConfig = getWagmiConfig();
 
 export type LunarLeaseWagmiConfig = ReturnType<typeof getWagmiConfig>;

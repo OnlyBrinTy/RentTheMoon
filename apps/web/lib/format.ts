@@ -1,5 +1,5 @@
-import { formatEther, parseEther, type Address } from "viem";
-import { ZERO_ADDRESS } from "@lunarlease/shared";
+import { formatEther, getAddress, isAddress, parseEther, type Address } from "viem";
+import { MUN_SYMBOL, ZERO_ADDRESS } from "@lunarlease/shared";
 import { nativeCurrencySymbol } from "./config";
 
 export function truncateAddress(address: Address | undefined, size = 4): string {
@@ -25,6 +25,17 @@ export function formatTokenAmount(wei: bigint, maxFractionDigits = 4): string {
 
 export function formatPrice(wei: bigint, maxFractionDigits = 4): string {
   return `${formatTokenAmount(wei, maxFractionDigits)} ${nativeCurrencySymbol}`;
+}
+
+export function formatMun(munWei: bigint, maxFractionDigits = 4): string {
+  return `${formatTokenAmount(munWei, maxFractionDigits)} ${MUN_SYMBOL}`;
+}
+
+export function tryParseAddress(value: string): Address | undefined {
+  const trimmed = value.trim();
+  if (!isAddress(trimmed)) return undefined;
+  const checksummed = getAddress(trimmed);
+  return checksummed === ZERO_ADDRESS ? undefined : checksummed;
 }
 
 export function toEtherInputValue(wei: bigint): string {

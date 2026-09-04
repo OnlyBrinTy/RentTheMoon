@@ -32,6 +32,11 @@ export interface SectorChainState {
   readonly salePrice: bigint;
 }
 
+export interface OwnershipPeriod {
+  readonly start: bigint;
+  readonly expiry: bigint;
+}
+
 export type SectorVisualState =
   | "unclaimed"
   | "owned"

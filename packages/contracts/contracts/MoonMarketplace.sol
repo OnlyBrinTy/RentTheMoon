@@ -10,10 +10,12 @@ import {IMoonLandRegistry} from "./interfaces/IMoonLandRegistry.sol";
 /// @title MoonMarketplace
 /// @notice Pricing, primary acquisition, ERC-4907 rentals and the secondary
 ///         market for LunarLease lunar sectors.
-/// @dev Holds every wei of POL in the system. All payouts are pull-based:
-///      nothing is pushed to a seller, owner or payer during acquisition,
-///      rental or sale, so a hostile recipient can never block another user's
-///      transaction. Not upgradeable.
+/// @dev Trading settles in MUN, a closed in-game currency held in `balances`
+///      and bought with POL through `popUpBalance` at `MUN_TO_ETH_RATE`. MUN
+///      cannot be redeemed for POL, so acquisition, rental and sale only move
+///      MUN between accounts and never send value out. The POL taken in is
+///      platform revenue and leaves only through `withdrawPlatformFunds`.
+///      Not upgradeable.
 contract MoonMarketplace is AccessControl, ReentrancyGuard {
     /// @notice Role allowed to move accumulated platform fees out of the contract.
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY_ROLE");
@@ -53,21 +55,21 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         uint256 salePrice;
     }
 
-    /// @notice the the balances of users in wei of MUN (not Model United Nations)
-    mapping(address sectorId => uint256) public balances;
+    /// @notice MUN balance of an account, in MUN wei (not Model United Nations).
+    mapping(address account => uint256 amount) public balances;
 
     /// @notice The sector registry this marketplace settles against.
     IMoonLandRegistry public immutable registry;
 
-    /// @notice Price of an unclaimed sector on the primary market, in wei.
+    /// @notice Price of an unclaimed sector on the primary market, in MUN wei.
     uint256 public initialSectorPrice;
     /// @notice Platform fee applied to rentals and secondary sales, in basis points.
     uint16 public platformFeeBps;
-    /// @notice Fees accrued to the platform and not yet withdrawn, in wei.
+    /// @notice POL taken in for MUN and not yet withdrawn by the treasury, in wei.
     uint256 public platformBalance;
+    /// @notice Account that receives platform MUN fees from rentals and sales.
+    address public treasury;
 
-    /// @notice Withdrawable balance of an account, in wei.
-    mapping(address account => uint256 amount) public claimableBalance;
     mapping(address account => uint64 time) private last_claimed_checkpoint;
 
     mapping(uint256 sectorId => SectorConfig config) private _configs;
@@ -86,9 +88,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     event SectorListingCancelled(uint256 indexed sectorId);
     /// @notice Emitted on a successful secondary sale.
     event SectorSold(uint256 indexed sectorId, address indexed seller, address indexed buyer, uint256 price);
-    /// @notice Emitted when an account pulls its accrued balance.
-    event RentalIncomeWithdrawn(address indexed account, uint256 amount);
-    /// @notice Emitted when the treasury pulls platform fees.
+    /// @notice Emitted when the treasury pulls platform revenue.
     event PlatformFundsWithdrawn(address indexed to, uint256 amount);
     /// @notice Emitted when the admin repriced the primary market.
     event InitialSectorPriceChanged(uint256 newPrice);
@@ -98,6 +98,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     event Deposited(address user, uint256 MUN_value);
     /// @notice Emmited once a user sends MUN to another user.
     event Sent(address from, address to, uint256 amount_MUN);
+    /// @notice Emitted when the admin changes the treasury account.
+    event TreasuryChanged(address indexed previous, address indexed current);
     /// @notice Emitted when an account claims the MUN farmed by its holdings.
     event FarmedBalanceClaimed(address indexed account, uint256 amount_MUN);
 
@@ -107,7 +109,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     error SectorAlreadyClaimed(uint256 sectorId);
     /// @notice Thrown when acting on a sector that does not exist yet.
     error SectorNotMinted(uint256 sectorId);
-    /// @notice Thrown when `msg.value` does not cover the required amount.
+    /// @notice Thrown when the amount available, usually the caller's MUN
+    ///         balance, does not cover the amount required.
     error InsufficientPayment(uint256 required, uint256 provided);
     /// @notice Thrown when the caller is not the ERC-721 owner of the sector.
     error NotSectorOwner(uint256 sectorId, address caller);
@@ -135,7 +138,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     error ZeroAddress();
 
     /// @param registry_ Address of the deployed `MoonLandRegistry`.
-    /// @param initialSectorPrice_ Primary-market price of a sector, in wei.
+    /// @param initialSectorPrice_ Primary-market price of a sector, in MUN wei.
     /// @param platformFeeBps_ Platform fee in basis points, at most 1000.
     /// @param admin Account receiving `DEFAULT_ADMIN_ROLE` and `TREASURY_ROLE`.
     constructor(address registry_, uint256 initialSectorPrice_, uint16 platformFeeBps_, address admin) {
@@ -145,14 +148,15 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         registry = IMoonLandRegistry(registry_);
         initialSectorPrice = initialSectorPrice_;
         platformFeeBps = platformFeeBps_;
+        treasury = admin;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(TREASURY_ROLE, admin);
     }
 
     /// @notice Claims an unowned sector on the primary market.
-    /// @dev Proceeds accrue to `platformBalance`; any overpayment accrues to the
-    ///      caller's `claimableBalance` instead of being refunded inline.
+    /// @dev Debits `initialSectorPrice` from the caller's MUN balance. The MUN
+    ///      is retired rather than credited anywhere, so no fee is split here.
     /// @param sectorId The sector to claim.
     function acquireSector(uint256 sectorId) external nonReentrant {
         if (!registry.isValidSector(sectorId)) revert InvalidSector(sectorId);
@@ -192,8 +196,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     }
 
     /// @notice Rents usage rights over a sector for a whole number of days.
-    /// @dev The owner's share and any overpayment accrue as claimable balances;
-    ///      only the ERC-4907 assignment leaves this contract.
+    /// @dev Debits the renter's MUN balance and credits the owner's, net of the
+    ///      platform fee; only the ERC-4907 assignment leaves this contract.
     /// @param sectorId The sector to rent.
     /// @param numberOfDays Rental length in days, within `[1, 365]`.
     function rentSector(uint256 sectorId, uint64 numberOfDays) external nonReentrant {
@@ -349,19 +353,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         return last_claimed_checkpoint[account];
     }
 
-    /// @notice Pulls the caller's accrued rental income, sale proceeds and refunds.
-    function withdrawRentalIncome() external nonReentrant {
-        uint256 amount = claimableBalance[msg.sender];
-        if (amount == 0) revert NothingToWithdraw();
-
-        claimableBalance[msg.sender] = 0;
-
-        emit RentalIncomeWithdrawn(msg.sender, amount);
-
-        Address.sendValue(payable(msg.sender), amount);
-    }
-
-    /// @notice Pulls accrued platform fees to `to`.
+    /// @notice Pulls accrued platform revenue to `to`.
     /// @param to Recipient of the fees.
     /// @param amount Amount to withdraw, in wei.
     function withdrawPlatformFunds(address to, uint256 amount) external nonReentrant onlyRole(TREASURY_ROLE) {
@@ -394,6 +386,17 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         platformFeeBps = newFeeBps;
 
         emit PlatformFeeBpsChanged(newFeeBps);
+    }
+
+    /// @notice Points platform MUN fees at `newTreasury`.
+    /// @param newTreasury The account to receive rental and sale fees in MUN.
+    function setTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newTreasury == address(0)) revert ZeroAddress();
+
+        address previous = treasury;
+        treasury = newTreasury;
+
+        emit TreasuryChanged(previous, newTreasury);
     }
 
     /// @notice Aggregated on-chain state of a single sector.
@@ -435,7 +438,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     function _splitProceeds(address beneficiary, uint256 total) private {
         uint256 fee = (total * platformFeeBps) / BPS_DENOMINATOR;
 
-        balances[address(this)] += fee;
+        balances[treasury] += fee;
         balances[beneficiary] += total - fee;
     }
 }

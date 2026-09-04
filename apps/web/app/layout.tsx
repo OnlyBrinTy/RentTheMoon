@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { cookieToInitialState } from "wagmi";
+import { cookieToInitialState, type State } from "wagmi";
 import { Providers } from "@/components/providers";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { getWagmiConfig } from "@/lib/wagmi";
+import { wagmiConfig } from "@/lib/wagmi";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,15 +20,24 @@ export const viewport: Viewport = {
   themeColor: "#04060f",
 };
 
+function sanitizeInitialState(state: State | undefined): State | undefined {
+  if (state === undefined) return undefined;
+  return {
+    ...state,
+    connections: new Map(),
+    current: null,
+    status: "disconnected",
+  };
+}
+
 export default async function RootLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
   const requestHeaders = await headers();
-  const initialState = cookieToInitialState(
-    getWagmiConfig(),
-    requestHeaders.get("cookie"),
+  const initialState = sanitizeInitialState(
+    cookieToInitialState(wagmiConfig, requestHeaders.get("cookie")),
   );
 
   return (

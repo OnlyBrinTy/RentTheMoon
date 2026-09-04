@@ -6,6 +6,7 @@ import { useSector } from "@/hooks/use-sector";
 import { contractsConfigured } from "@/lib/config";
 import { Card, CardBody, CardHeader, CardSubtitle, CardTitle } from "@/components/ui/card";
 import { ContractsNotConfigured } from "@/components/ui/contracts-not-configured";
+import { describeContractReadError } from "@/lib/errors";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { SectorActions } from "./sector-actions";
 import { SectorStats } from "./sector-stats";
@@ -59,7 +60,9 @@ export function SectorPanel({ sectorId, showDetailLink = true }: SectorPanelProp
         ) : isError ? (
           <div className="rounded-lg border border-rose-400/25 bg-rose-400/8 px-3 py-2.5 text-xs text-rose-100/80">
             <p className="font-semibold">Could not read sector state</p>
-            <p className="mt-1 opacity-75">{error?.message ?? "Unknown RPC error."}</p>
+            <p className="mt-1 opacity-75">
+              {error !== null ? describeContractReadError(error) : "Unknown RPC error."}
+            </p>
           </div>
         ) : sector !== undefined ? (
           <>

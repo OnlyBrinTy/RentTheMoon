@@ -34,8 +34,22 @@ export const moonMarketplaceAbi = [
   },
   {
     type: "function",
+    name: "MUN_TO_ETH_RATE",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64", internalType: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "FARMED_MUN_PER_DAY",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "function",
     name: "acquireSector",
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
     outputs: [],
   },
@@ -62,7 +76,7 @@ export const moonMarketplaceAbi = [
   {
     type: "function",
     name: "rentSector",
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     inputs: [
       { name: "sectorId", type: "uint256", internalType: "uint256" },
       { name: "numberOfDays", type: "uint64", internalType: "uint64" },
@@ -89,16 +103,68 @@ export const moonMarketplaceAbi = [
   {
     type: "function",
     name: "buyListedSector",
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
     outputs: [],
   },
   {
     type: "function",
-    name: "claimableBalance",
+    name: "balances",
+    stateMutability: "view",
+    inputs: [{ name: "sectorId", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getMUNBalance",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "popUpBalance",
+    stateMutability: "payable",
+    inputs: [{ name: "user", type: "address", internalType: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "sendMUN",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address", internalType: "address" },
+      { name: "amount_MUN", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "farmedBalance",
     stateMutability: "view",
     inputs: [{ name: "account", type: "address", internalType: "address" }],
     outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "farmCheckpoint",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint64", internalType: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "claimFarmedBalance",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "treasury",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address", internalType: "address" }],
   },
   {
     type: "function",
@@ -106,13 +172,6 @@ export const moonMarketplaceAbi = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "withdrawRentalIncome",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
   },
   {
     type: "function",
@@ -136,6 +195,13 @@ export const moonMarketplaceAbi = [
     name: "setPlatformFeeBps",
     stateMutability: "nonpayable",
     inputs: [{ name: "newFeeBps", type: "uint16", internalType: "uint16" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setTreasury",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "newTreasury", type: "address", internalType: "address" }],
     outputs: [],
   },
   {
@@ -235,10 +301,10 @@ export const moonMarketplaceAbi = [
   },
   {
     type: "event",
-    name: "RentalIncomeWithdrawn",
+    name: "TreasuryChanged",
     inputs: [
-      { name: "account", type: "address", indexed: true, internalType: "address" },
-      { name: "amount", type: "uint256", indexed: false, internalType: "uint256" },
+      { name: "previous", type: "address", indexed: true, internalType: "address" },
+      { name: "current", type: "address", indexed: true, internalType: "address" },
     ],
     anonymous: false,
   },
@@ -248,6 +314,34 @@ export const moonMarketplaceAbi = [
     inputs: [
       { name: "to", type: "address", indexed: true, internalType: "address" },
       { name: "amount", type: "uint256", indexed: false, internalType: "uint256" },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "Deposited",
+    inputs: [
+      { name: "user", type: "address", indexed: false, internalType: "address" },
+      { name: "MUN_value", type: "uint256", indexed: false, internalType: "uint256" },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "Sent",
+    inputs: [
+      { name: "from", type: "address", indexed: false, internalType: "address" },
+      { name: "to", type: "address", indexed: false, internalType: "address" },
+      { name: "amount_MUN", type: "uint256", indexed: false, internalType: "uint256" },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "FarmedBalanceClaimed",
+    inputs: [
+      { name: "account", type: "address", indexed: true, internalType: "address" },
+      { name: "amount_MUN", type: "uint256", indexed: false, internalType: "uint256" },
     ],
     anonymous: false,
   },

@@ -4,107 +4,102 @@ import { describe, it } from "mocha";
 import {
   INITIAL_SECTOR_PRICE,
   SECTOR_A,
+  TOP_UP_VALUE,
   ZERO_ADDRESS,
   beneficiaryShareOf,
+  deployFunded,
   deployLunarLease,
   deployWithRentableSector,
   ethers,
+  fundMUN,
   networkHelpers,
+  platformFeeOf,
 } from "./helpers.js";
 
-describe("MoonMarketplace — pull payments", () => {
-  it("pays out the caller's balance and zeroes it", async () => {
-    const { marketplace, alice, bob, pricePerDay, marketplaceAddress } =
+describe("MoonMarketplace — rental proceeds", () => {
+  it("credits the owner's MUN balance", async () => {
+    const { marketplace, admin, alice, bob, pricePerDay } =
       await networkHelpers.loadFixture(deployWithRentableSector);
 
     const totalPrice = pricePerDay * 4n;
-    await marketplace.connect(bob).rentSector(SECTOR_A, 4n, { value: totalPrice });
+    const ownerBefore = await marketplace.getMUNBalance(alice.address);
+    const treasuryBefore = await marketplace.getMUNBalance(admin.address);
 
-    const owed = beneficiaryShareOf(totalPrice);
-    expect(await marketplace.claimableBalance(alice.address)).to.equal(owed);
+    await marketplace.connect(bob).rentSector(SECTOR_A, 4n);
 
-    await expect(marketplace.connect(alice).withdrawRentalIncome())
-      .to.emit(marketplace, "RentalIncomeWithdrawn")
-      .withArgs(alice.address, owed);
-
-    expect(await marketplace.claimableBalance(alice.address)).to.equal(0n);
-    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(
-      INITIAL_SECTOR_PRICE + totalPrice - owed,
-    );
-  });
-
-  it("moves the exact balance to the caller's wallet", async () => {
-    const { marketplace, alice, bob, pricePerDay } =
-      await networkHelpers.loadFixture(deployWithRentableSector);
-
-    const totalPrice = pricePerDay * 4n;
-    await marketplace.connect(bob).rentSector(SECTOR_A, 4n, { value: totalPrice });
-
-    await expect(marketplace.connect(alice).withdrawRentalIncome()).to.changeEtherBalance(
-      ethers,
-      alice,
+    expect((await marketplace.getMUNBalance(alice.address)) - ownerBefore).to.equal(
       beneficiaryShareOf(totalPrice),
     );
+    expect((await marketplace.getMUNBalance(admin.address)) - treasuryBefore).to.equal(
+      platformFeeOf(totalPrice),
+    );
   });
 
-  it("rejects a withdrawal with nothing owed", async () => {
-    const { marketplace, carol } = await networkHelpers.loadFixture(deployWithRentableSector);
-
-    await expect(
-      marketplace.connect(carol).withdrawRentalIncome(),
-    ).to.be.revertedWithCustomError(marketplace, "NothingToWithdraw");
-  });
-
-  it("rejects a second withdrawal of the same balance", async () => {
-    const { marketplace, alice, bob, pricePerDay } =
+  it("lets the owner move rental income on with sendMUN", async () => {
+    const { marketplace, alice, bob, carol, pricePerDay } =
       await networkHelpers.loadFixture(deployWithRentableSector);
 
-    await marketplace.connect(bob).rentSector(SECTOR_A, 1n, { value: pricePerDay });
-    await marketplace.connect(alice).withdrawRentalIncome();
+    const totalPrice = pricePerDay * 4n;
+    await marketplace.connect(bob).rentSector(SECTOR_A, 4n);
 
-    await expect(
-      marketplace.connect(alice).withdrawRentalIncome(),
-    ).to.be.revertedWithCustomError(marketplace, "NothingToWithdraw");
+    const income = beneficiaryShareOf(totalPrice);
+    const recipientBefore = await marketplace.getMUNBalance(carol.address);
+
+    await marketplace.connect(alice).sendMUN(carol.address, income);
+
+    expect((await marketplace.getMUNBalance(carol.address)) - recipientBefore).to.equal(income);
+  });
+
+  it("never sends POL to users when MUN changes hands", async () => {
+    const { marketplace, bob, carol, pricePerDay, marketplaceAddress } =
+      await networkHelpers.loadFixture(deployWithRentableSector);
+
+    const heldBefore = await ethers.provider.getBalance(marketplaceAddress);
+
+    await marketplace.connect(bob).acquireSector(42n);
+    await marketplace.connect(carol).rentSector(SECTOR_A, 1n);
+    await marketplace.connect(bob).listForSale(42n, pricePerDay);
+    await marketplace.connect(carol).buyListedSector(42n);
+
+    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(heldBefore);
   });
 });
 
 describe("MoonMarketplace — platform treasury", () => {
-  it("lets TREASURY_ROLE move accrued fees out", async () => {
+  it("lets TREASURY_ROLE move accrued POL out", async () => {
     const { marketplace, admin, alice, carol } =
       await networkHelpers.loadFixture(deployLunarLease);
 
-    await marketplace.connect(alice).acquireSector(SECTOR_A, { value: INITIAL_SECTOR_PRICE });
+    await fundMUN(marketplace, alice, INITIAL_SECTOR_PRICE);
+    const available = await marketplace.platformBalance();
 
-    await expect(
-      marketplace.connect(admin).withdrawPlatformFunds(carol.address, INITIAL_SECTOR_PRICE),
-    )
+    await expect(marketplace.connect(admin).withdrawPlatformFunds(carol.address, available))
       .to.emit(marketplace, "PlatformFundsWithdrawn")
-      .withArgs(carol.address, INITIAL_SECTOR_PRICE);
+      .withArgs(carol.address, available);
 
     expect(await marketplace.platformBalance()).to.equal(0n);
   });
 
-  it("rejects a platform withdrawal from an account without TREASURY_ROLE", async () => {
-    const { marketplace, alice, bob } = await networkHelpers.loadFixture(deployLunarLease);
+  it("treats every top-up as platform revenue", async () => {
+    const { marketplace, marketplaceAddress } = await networkHelpers.loadFixture(deployFunded);
 
-    await marketplace.connect(alice).acquireSector(SECTOR_A, { value: INITIAL_SECTOR_PRICE });
-
-    await expect(
-      marketplace.connect(bob).withdrawPlatformFunds(bob.address, INITIAL_SECTOR_PRICE),
-    )
-      .to.be.revertedWithCustomError(marketplace, "AccessControlUnauthorizedAccount")
-      .withArgs(bob.address, await marketplace.TREASURY_ROLE());
-
-    await expect(
-      marketplace.connect(alice).withdrawPlatformFunds(alice.address, 1n),
-    ).to.be.revertedWithCustomError(marketplace, "AccessControlUnauthorizedAccount");
+    expect(await marketplace.platformBalance()).to.equal(TOP_UP_VALUE * 3n);
+    expect(await ethers.provider.getBalance(marketplaceAddress)).to.equal(TOP_UP_VALUE * 3n);
   });
 
-  it("cannot reach into balances owed to users", async () => {
-    const { marketplace, admin, bob, pricePerDay, treasury } =
+  it("rejects a platform withdrawal from an account without TREASURY_ROLE", async () => {
+    const { marketplace, bob } = await networkHelpers.loadFixture(deployFunded);
+
+    await expect(marketplace.connect(bob).withdrawPlatformFunds(bob.address, 1n))
+      .to.be.revertedWithCustomError(marketplace, "AccessControlUnauthorizedAccount")
+      .withArgs(bob.address, await marketplace.TREASURY_ROLE());
+  });
+
+  it("cannot withdraw more POL than was ever deposited", async () => {
+    const { marketplace, admin, bob, treasury } =
       await networkHelpers.loadFixture(deployWithRentableSector);
 
-    await marketplace.connect(bob).rentSector(SECTOR_A, 1n, { value: pricePerDay });
+    await marketplace.connect(bob).rentSector(SECTOR_A, 1n);
 
     const available = await marketplace.platformBalance();
 
@@ -113,6 +108,21 @@ describe("MoonMarketplace — platform treasury", () => {
     )
       .to.be.revertedWithCustomError(marketplace, "InsufficientPlatformBalance")
       .withArgs(available + 1n, available);
+  });
+
+  it("does not grow the withdrawable POL when MUN changes hands", async () => {
+    const { marketplace, admin, bob, pricePerDay } =
+      await networkHelpers.loadFixture(deployWithRentableSector);
+
+    const before = await marketplace.platformBalance();
+    const treasuryBefore = await marketplace.getMUNBalance(admin.address);
+
+    await marketplace.connect(bob).rentSector(SECTOR_A, 3n);
+
+    expect(await marketplace.platformBalance()).to.equal(before);
+    expect((await marketplace.getMUNBalance(admin.address)) - treasuryBefore).to.equal(
+      platformFeeOf(pricePerDay * 3n),
+    );
   });
 
   it("rejects zero-value and zero-address platform withdrawals", async () => {
@@ -131,12 +141,40 @@ describe("MoonMarketplace — platform treasury", () => {
     const { marketplace, admin, alice, treasury } =
       await networkHelpers.loadFixture(deployLunarLease);
 
-    await marketplace.connect(alice).acquireSector(SECTOR_A, { value: INITIAL_SECTOR_PRICE });
+    await fundMUN(marketplace, alice, INITIAL_SECTOR_PRICE);
     await marketplace.connect(admin).grantRole(await marketplace.TREASURY_ROLE(), treasury.address);
 
+    const available = await marketplace.platformBalance();
+
     await expect(
-      marketplace.connect(treasury).withdrawPlatformFunds(treasury.address, INITIAL_SECTOR_PRICE),
-    ).to.changeEtherBalance(ethers, treasury, INITIAL_SECTOR_PRICE);
+      marketplace.connect(treasury).withdrawPlatformFunds(treasury.address, available),
+    ).to.changeEtherBalance(ethers, treasury, available);
+  });
+
+  it("lets the admin retarget platform MUN fees", async () => {
+    const { marketplace, admin, treasury, bob, pricePerDay } =
+      await networkHelpers.loadFixture(deployWithRentableSector);
+
+    await expect(marketplace.connect(admin).setTreasury(treasury.address))
+      .to.emit(marketplace, "TreasuryChanged")
+      .withArgs(admin.address, treasury.address);
+
+    expect(await marketplace.treasury()).to.equal(treasury.address);
+
+    const treasuryBefore = await marketplace.getMUNBalance(treasury.address);
+    await marketplace.connect(bob).rentSector(SECTOR_A, 2n);
+
+    expect((await marketplace.getMUNBalance(treasury.address)) - treasuryBefore).to.equal(
+      platformFeeOf(pricePerDay * 2n),
+    );
+  });
+
+  it("rejects a zero treasury address", async () => {
+    const { marketplace, admin } = await networkHelpers.loadFixture(deployLunarLease);
+
+    await expect(
+      marketplace.connect(admin).setTreasury(ZERO_ADDRESS),
+    ).to.be.revertedWithCustomError(marketplace, "ZeroAddress");
   });
 });
 

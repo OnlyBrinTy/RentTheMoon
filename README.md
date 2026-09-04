@@ -62,8 +62,10 @@ pnpm deploy:local   # terminal 2: deploy via Hardhat Ignition
 pnpm dev            # terminal 3: frontend against localhost:8545
 ```
 
-Deployment writes `packages/contracts/deployments/<chainId>.json`; copy the two
-addresses into `apps/web/.env.local` (see `apps/web/.env.example`).
+`pnpm deploy:local` writes `packages/contracts/deployments/<chainId>.json` and
+syncs `apps/web/.env.local` with the registry and marketplace addresses. Run it
+again after every chain restart — a running node with no deployment is the usual
+cause of empty contract reads such as `getSector` returning `"0x"`.
 
 ### Tests
 
