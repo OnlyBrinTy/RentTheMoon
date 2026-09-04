@@ -33,6 +33,11 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
     }
 
     mapping(uint256 sectorId => UserInfo info) private _users;
+    mapping(address holder => OwnershipPeriod[]) public ownership_periods;
+    mapping(address user => uint64 owned) public num_owned_sectors;
+
+    /// @dev Sentinel `expiry` marking a period as open-ended ownership.
+    uint64 private constant _NO_EXPIRY = 0;
 
     /// @notice Thrown when a sector id falls outside the lunar grid.
     error InvalidSector(uint256 sectorId);
@@ -68,6 +73,7 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
     function mintSector(uint256 sectorId, address to) external onlyRole(MARKETPLACE_ROLE) {
         if (!isValidSector(sectorId)) revert InvalidSector(sectorId);
         if (exists(sectorId)) revert SectorAlreadyClaimed(sectorId);
+
         _safeMint(to, sectorId);
     }
 
@@ -75,13 +81,26 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
     /// @dev Passing `address(0)` with `expires` zero clears the usage right.
     function setUser(uint256 sectorId, address user, uint64 expires) external onlyRole(MARKETPLACE_ROLE) {
         if (!exists(sectorId)) revert SectorNotMinted(sectorId);
-        _users[sectorId] = UserInfo({user: user, expires: expires});
+
+        UserInfo storage previous = _users[sectorId];
+        if (previous.user != address(0)) {
+            _closePeriod(previous.user, previous.expires);
+        }
+
+        if (user != address(0) && expires > block.timestamp) {
+            _openPeriod(user, expires);
+            _users[sectorId] = UserInfo({user: user, expires: expires});
+        } else {
+            delete _users[sectorId];
+        }
+
         emit UpdateUser(sectorId, user, expires);
     }
 
     /// @inheritdoc IMoonLandRegistry
     function marketplaceTransfer(uint256 sectorId, address from, address to) external onlyRole(MARKETPLACE_ROLE) {
         if (!exists(sectorId)) revert SectorNotMinted(sectorId);
+
         _transfer(from, to, sectorId);
     }
 
@@ -97,6 +116,47 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
     /// @inheritdoc IERC4907
     function userExpires(uint256 sectorId) public view returns (uint256) {
         return _users[sectorId].expires;
+    }
+
+    /// @inheritdoc IMoonLandRegistry
+    /// @dev Only prunes the array; `userOf` already treats an elapsed window as cleared.
+    function cleanExpiredPeriods(address holder) external {
+        OwnershipPeriod[] storage periods = ownership_periods[holder];
+        uint256 i = 0;
+
+        while (i < periods.length) {
+            uint64 expiry = periods[i].expiry;
+            if (expiry != _NO_EXPIRY && block.timestamp >= expiry) {
+                periods[i] = periods[periods.length - 1];
+                periods.pop();
+            } else {
+                ++i;
+            }
+        }
+    }
+
+    /// @inheritdoc IMoonLandRegistry
+    function getOwnershipPeriods(address holder) external view returns (OwnershipPeriod[] memory) {
+        return ownership_periods[holder];
+    }
+
+    /// @dev Periods are anonymous, so `expiry` is their only identity: any one
+    ///      matching entry is dropped.
+    function _closePeriod(address holder, uint64 expiry) private {
+        OwnershipPeriod[] storage periods = ownership_periods[holder];
+        uint256 length = periods.length;
+
+        for (uint256 i = 0; i < length; ++i) {
+            if (periods[i].expiry == expiry) {
+                periods[i] = periods[length - 1];
+                periods.pop();
+                break;
+            }
+        }
+    }
+
+    function _openPeriod(address holder, uint64 expiry) private {
+        ownership_periods[holder].push(OwnershipPeriod({start: uint64(block.timestamp), expiry: expiry}));
     }
 
     /// @notice ERC-721 metadata as an on-chain `data:` URI.
@@ -145,16 +205,34 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
         return interfaceId == type(IERC4907).interfaceId || super.supportsInterface(interfaceId);
     }
 
-    /// @dev Every ownership change clears the ERC-4907 user so a transferred
-    ///      sector never carries an inherited renter.
+    /// @dev The single choke point for holding bookkeeping: mints, marketplace
+    ///      sales and direct ERC-721 transfers all pass through here, so owner
+    ///      counts and ownership periods cannot drift apart. Every ownership
+    ///      change also clears the ERC-4907 user, so a transferred sector never
+    ///      carries an inherited renter.
     function _update(address to, uint256 sectorId, address auth)
         internal
         override(ERC721, ERC721Enumerable)
         returns (address)
     {
         address from = super._update(to, sectorId, auth);
+        if (from == to) return from;
 
-        if (from != to && _users[sectorId].expires != 0) {
+        if (from != address(0)) {
+            num_owned_sectors[from] -= 1;
+            _closePeriod(from, _NO_EXPIRY);
+        }
+
+        if (to != address(0)) {
+            num_owned_sectors[to] += 1;
+            _openPeriod(to, _NO_EXPIRY);
+        }
+
+        UserInfo storage info = _users[sectorId];
+        if (info.expires != 0) {
+            if (info.user != address(0)) {
+                _closePeriod(info.user, info.expires);
+            }
             delete _users[sectorId];
             emit UpdateUser(sectorId, address(0), 0);
         }

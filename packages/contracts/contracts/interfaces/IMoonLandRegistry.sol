@@ -34,4 +34,22 @@ interface IMoonLandRegistry is IERC721, IERC4907 {
     /// @param from The current owner.
     /// @param to The buyer.
     function marketplaceTransfer(uint256 sectorId, address from, address to) external;
+
+    /// @notice An anonymous holding period over one sector. A zero `expiry`
+    ///         means open-ended, which is how ownership is recorded; a non-zero
+    ///         `expiry` is a rental window.
+    struct OwnershipPeriod {
+        uint64 start;
+        uint64 expiry;
+    }
+
+    /// @notice Drops every elapsed period of `holder`. Open-ended ownership
+    ///         periods are never pruned.
+    /// @param holder The account whose periods are pruned.
+    function cleanExpiredPeriods(address holder) external;
+
+    /// @notice Every period currently recorded for `holder`, owned and rented alike.
+    /// @param holder The account to query.
+    /// @return The account's periods, in storage order.
+    function getOwnershipPeriods(address holder) external view returns (OwnershipPeriod[] memory);
 }

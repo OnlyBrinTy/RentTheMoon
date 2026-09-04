@@ -30,6 +30,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     uint64 public constant SECONDS_PER_DAY = 86_400;
     /// @notice the conversion rate from the local inflatable currency MUN to ETH (1 ETH = 10 MUN)
     uint64 public constant MUN_TO_ETH_RATE = 10;
+    /// @notice MUN farmed per day, in MUN wei, for each sector an account holds.
+    uint256 public constant FARMED_MUN_PER_DAY = 1e18;
 
     /// @notice Aggregated per-sector state, so the frontend needs one call per sector.
     struct SectorView {
@@ -66,6 +68,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
 
     /// @notice Withdrawable balance of an account, in wei.
     mapping(address account => uint256 amount) public claimableBalance;
+    mapping(address account => uint64 time) private last_claimed_checkpoint;
 
     mapping(uint256 sectorId => SectorConfig config) private _configs;
 
@@ -95,6 +98,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     event Deposited(address user, uint256 MUN_value);
     /// @notice Emmited once a user sends MUN to another user.
     event Sent(address from, address to, uint256 amount_MUN);
+    /// @notice Emitted when an account claims the MUN farmed by its holdings.
+    event FarmedBalanceClaimed(address indexed account, uint256 amount_MUN);
 
     /// @notice Thrown when a sector id falls outside the lunar grid.
     error InvalidSector(uint256 sectorId);
@@ -293,6 +298,55 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         balances[to] += amount_MUN;
 
         emit Sent(msg.sender, to, amount_MUN);
+    }
+
+    function getMUNBalance(address user) external view returns (uint256) {
+        return balances[user];
+    }
+
+    /// @notice MUN farmed by `account` since its last claim and not yet credited.
+    /// @dev Sums the time each of the account's holding periods overlaps the
+    ///      window since its checkpoint, so owning and renting both farm and a
+    ///      sector held twice over counts twice.
+    /// @param account The account to price.
+    /// @return The claimable amount, in MUN wei.
+    function farmedBalance(address account) public view returns (uint256) {
+        IMoonLandRegistry.OwnershipPeriod[] memory periods = registry.getOwnershipPeriods(account);
+        uint64 checkpoint = last_claimed_checkpoint[account];
+        uint64 upperBound = uint64(block.timestamp);
+        uint256 secondsHeld;
+
+        for (uint256 i = 0; i < periods.length; ++i) {
+            uint64 from = periods[i].start > checkpoint ? periods[i].start : checkpoint;
+            uint64 expiry = periods[i].expiry;
+            uint64 to = (expiry == 0 || expiry > upperBound) ? upperBound : expiry;
+
+            if (to > from) secondsHeld += to - from;
+        }
+
+        return (secondsHeld * FARMED_MUN_PER_DAY) / SECONDS_PER_DAY;
+    }
+
+    /// @notice Credits the caller's farmed MUN to its balance and resets the checkpoint.
+    /// @dev Newly issued MUN, not a transfer out of the platform's holdings.
+    /// @return The amount credited, in MUN wei.
+    function claimFarmedBalance() external nonReentrant returns (uint256) {
+        uint256 amount = farmedBalance(msg.sender);
+        if (amount == 0) revert NothingToWithdraw();
+
+        last_claimed_checkpoint[msg.sender] = uint64(block.timestamp);
+        balances[msg.sender] += amount;
+
+        emit FarmedBalanceClaimed(msg.sender, amount);
+
+        return amount;
+    }
+
+    /// @notice Timestamp `account` last claimed farmed MUN at, zero if never.
+    /// @param account The account to query.
+    /// @return The checkpoint, as a Unix timestamp.
+    function farmCheckpoint(address account) external view returns (uint64) {
+        return last_claimed_checkpoint[account];
     }
 
     /// @notice Pulls the caller's accrued rental income, sale proceeds and refunds.
