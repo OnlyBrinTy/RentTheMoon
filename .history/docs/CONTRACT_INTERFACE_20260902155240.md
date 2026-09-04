@@ -27,7 +27,7 @@ Mirrored in TypeScript at `packages/shared/src/constants/index.ts`.
 Two contracts. `MoonMarketplace` holds all money and pricing;
 `MoonLandRegistry` holds ownership and ERC-4907 usage rights.
 
-### MoonLandRegistry (ERC-721 + ERC-4907 + AccessControl)
+### MoonLandRegistry (`ERC`-721 + ERC-4907 + AccessControl)
 
 Roles: `DEFAULT_ADMIN_ROLE`, `MARKETPLACE_ROLE`.
 

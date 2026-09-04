@@ -251,17 +251,107 @@ export const moonMarketplaceAbi = [
     ],
     anonymous: false,
   },
-  { type: "error", name: "InvalidSector", inputs: [] },
-  { type: "error", name: "SectorAlreadyClaimed", inputs: [] },
-  { type: "error", name: "InsufficientPayment", inputs: [] },
-  { type: "error", name: "SectorNotMinted", inputs: [] },
-  { type: "error", name: "RentNotEnabled", inputs: [] },
-  { type: "error", name: "AlreadyRented", inputs: [] },
-  { type: "error", name: "InvalidDuration", inputs: [] },
-  { type: "error", name: "CannotRentOwnSector", inputs: [] },
-  { type: "error", name: "NotListed", inputs: [] },
-  { type: "error", name: "CannotBuyOwnSector", inputs: [] },
-  { type: "error", name: "SectorCurrentlyRented", inputs: [] },
-  { type: "error", name: "NotSectorOwner", inputs: [] },
+  { type: "error", name: "AccessControlBadConfirmation", inputs: [] },
+  {
+    type: "error",
+    name: "AccessControlUnauthorizedAccount",
+    inputs: [
+      { name: "account", type: "address", internalType: "address" },
+      { name: "neededRole", type: "bytes32", internalType: "bytes32" },
+    ],
+  },
+  {
+    type: "error",
+    name: "AlreadyRented",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "CannotBuyOwnSector",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "CannotRentOwnSector",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  { type: "error", name: "FailedCall", inputs: [] },
+  {
+    type: "error",
+    name: "FeeTooHigh",
+    inputs: [
+      { name: "requested", type: "uint16", internalType: "uint16" },
+      { name: "maximum", type: "uint16", internalType: "uint16" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InsufficientBalance",
+    inputs: [
+      { name: "balance", type: "uint256", internalType: "uint256" },
+      { name: "needed", type: "uint256", internalType: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InsufficientPayment",
+    inputs: [
+      { name: "required", type: "uint256", internalType: "uint256" },
+      { name: "provided", type: "uint256", internalType: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InsufficientPlatformBalance",
+    inputs: [
+      { name: "requested", type: "uint256", internalType: "uint256" },
+      { name: "available", type: "uint256", internalType: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InvalidDuration",
+    inputs: [{ name: "numberOfDays", type: "uint64", internalType: "uint64" }],
+  },
+  {
+    type: "error",
+    name: "InvalidSector",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "NotListed",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "NotSectorOwner",
+    inputs: [
+      { name: "sectorId", type: "uint256", internalType: "uint256" },
+      { name: "caller", type: "address", internalType: "address" },
+    ],
+  },
   { type: "error", name: "NothingToWithdraw", inputs: [] },
+  { type: "error", name: "ReentrancyGuardReentrantCall", inputs: [] },
+  {
+    type: "error",
+    name: "RentNotEnabled",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "SectorAlreadyClaimed",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "SectorCurrentlyRented",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "SectorNotMinted",
+    inputs: [{ name: "sectorId", type: "uint256", internalType: "uint256" }],
+  },
+  { type: "error", name: "ZeroAddress", inputs: [] },
 ] as const;

@@ -7,18 +7,16 @@ updating this file first.
 
 ## Constants
 
-
-| Name                                       | Value                                         |
-| ------------------------------------------ | --------------------------------------------- |
-| `LATITUDE_STEP_DEG` / `LONGITUDE_STEP_DEG` | 5                                             |
-| `TOTAL_SECTORS`                            | 2592 (36 latitude bands × 72 longitude bands) |
-| valid `sectorId`                           | `0 <= sectorId < 2592`                        |
-| `sectorId` formula                         | `latitudeIndex * 72 + longitudeIndex`         |
-| `INITIAL_SECTOR_PRICE`                     | `0.1 POL` = `100000000000000000` wei          |
-| `PLATFORM_FEE_BPS`                         | `300` (3%), denominator `10000`               |
-| `MIN_RENTAL_DAYS` / `MAX_RENTAL_DAYS`      | `1` / `365`                                   |
-| `SECONDS_PER_DAY`                          | `86400`                                       |
-
+| Name | Value |
+| --- | --- |
+| `LATITUDE_STEP_DEG` / `LONGITUDE_STEP_DEG` | 5 |
+| `TOTAL_SECTORS` | 2592 (36 latitude bands × 72 longitude bands) |
+| valid `sectorId` | `0 <= sectorId < 2592` |
+| `sectorId` formula | `latitudeIndex * 72 + longitudeIndex` |
+| `INITIAL_SECTOR_PRICE` | `0.1 POL` = `100000000000000000` wei |
+| `PLATFORM_FEE_BPS` | `300` (3%), denominator `10000` |
+| `MIN_RENTAL_DAYS` / `MAX_RENTAL_DAYS` | `1` / `365` |
+| `SECONDS_PER_DAY` | `86400` |
 
 Mirrored in TypeScript at `packages/shared/src/constants/index.ts`.
 
@@ -112,8 +110,6 @@ function getSector(uint256 sectorId) external view returns (SectorView memory);
 function getSectors(uint256[] calldata sectorIds) external view returns (SectorView[] memory);
 ```
 
-
-
 ### Events (indexed by Ponder in Phase 13)
 
 ```solidity
@@ -128,12 +124,9 @@ event RentalIncomeWithdrawn(address indexed account, uint256 amount);
 event PlatformFundsWithdrawn(address indexed to, uint256 amount);
 ```
 
-
-
 ## Behavioural rules
 
 Primary acquisition (`acquireSector`):
-
 - reverts `InvalidSector` when `sectorId >= 2592`
 - reverts `SectorAlreadyClaimed` when already minted
 - reverts `InsufficientPayment` when `msg.value < initialSectorPrice`
@@ -141,9 +134,8 @@ Primary acquisition (`acquireSector`):
 - proceeds go to `platformBalance`; POL stays in the contract until withdrawn
 
 Rental (`rentSector`):
-
 - reverts `SectorNotMinted`, `RentNotEnabled`, `AlreadyRented`, `InvalidDuration`
-(`numberOfDays` outside `[1, 365]`), `InsufficientPayment`
+  (`numberOfDays` outside `[1, 365]`), `InsufficientPayment`
 - owner cannot rent their own sector (`CannotRentOwnSector`)
 - `totalPrice = pricePerDay * numberOfDays`
 - `expiresAt = uint64(block.timestamp) + numberOfDays * 86400`
@@ -151,13 +143,11 @@ Rental (`rentSector`):
 - overpayment credited back to the renter's `claimableBalance`
 
 Secondary sale (`buyListedSector`):
-
 - reverts `NotListed`, `InsufficientPayment`, `CannotBuyOwnSector`
 - reverts `SectorCurrentlyRented` when `userExpires(sectorId) >= block.timestamp`
 - same 3% fee split, listing cleared, `SectorSold` emitted
 
 Owner-only (`setRentalPrice`, `setRentEnabled`, `listForSale`, `cancelListing`):
-
 - revert `NotSectorOwner` for anyone other than `registry.ownerOf(sectorId)`
 
 Security: checks-effects-interactions everywhere, `nonReentrant` on every
@@ -188,4 +178,3 @@ infer types. They must stay byte-compatible with the signatures above.
 
 > Lunar sectors represent virtual ownership within the LunarLease system. They do
 > not represent legally recognized ownership of physical lunar territory.
-

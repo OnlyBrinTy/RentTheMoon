@@ -1,4 +1,10 @@
 import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError } from "viem";
+import { ConnectorAlreadyConnectedError, ProviderNotFoundError } from "wagmi";
+
+export function isAlreadyConnectedError(error: unknown): boolean {
+  if (error instanceof ConnectorAlreadyConnectedError) return true;
+  return error instanceof Error && /already connected/i.test(error.message);
+}
 
 const revertMessages: Record<string, string> = {
   InvalidSector: "That sector id is outside the lunar grid.",
@@ -19,6 +25,14 @@ const revertMessages: Record<string, string> = {
 
 export function describeTransactionError(error: unknown): string {
   if (error === null || error === undefined) return "Unknown error.";
+
+  if (error instanceof ProviderNotFoundError) {
+    return "No browser wallet detected. Install MetaMask (or another injected wallet) and reload this page.";
+  }
+
+  if (isAlreadyConnectedError(error)) {
+    return "This wallet is already connected. Disconnect first, or switch account in MetaMask.";
+  }
 
   if (error instanceof BaseError) {
     const rejection = error.walk((inner) => inner instanceof UserRejectedRequestError);

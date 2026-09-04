@@ -14,7 +14,7 @@ updating this file first.
 | `TOTAL_SECTORS`                            | 2592 (36 latitude bands × 72 longitude bands) |
 | valid `sectorId`                           | `0 <= sectorId < 2592`                        |
 | `sectorId` formula                         | `latitudeIndex * 72 + longitudeIndex`         |
-| `INITIAL_SECTOR_PRICE`                     | `0.1 POL` = `100000000000000000` wei          |
+| `INITIAL_SECTOR_PRICE`                     | `0.1 ,` = `100000000000000000` wei            |
 | `PLATFORM_FEE_BPS`                         | `300` (3%), denominator `10000`               |
 | `MIN_RENTAL_DAYS` / `MAX_RENTAL_DAYS`      | `1` / `365`                                   |
 | `SECONDS_PER_DAY`                          | `86400`                                       |

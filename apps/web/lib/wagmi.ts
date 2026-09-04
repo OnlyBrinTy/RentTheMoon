@@ -1,5 +1,5 @@
 import { createConfig, createStorage, cookieStorage, http } from "wagmi";
-import { injected, walletConnect } from "wagmi/connectors";
+import { injected } from "wagmi/connectors";
 import type { CreateConnectorFn } from "wagmi";
 import { CHAIN_IDS } from "@lunarlease/shared";
 import {
@@ -7,29 +7,21 @@ import {
   activeChainId,
   rpcUrl,
   supportedChainList,
-  walletConnectProjectId,
   type SupportedChain,
 } from "./config";
 
 function buildConnectors(): CreateConnectorFn[] {
-  const connectors: CreateConnectorFn[] = [injected({ shimDisconnect: true })];
-
-  if (walletConnectProjectId !== undefined) {
-    connectors.push(
-      walletConnect({
-        projectId: walletConnectProjectId,
-        showQrModal: true,
-        metadata: {
-          name: "LunarLease",
-          description: "Acquire and rent virtual sectors of the Moon.",
-          url: "https://lunarlease.example",
-          icons: [],
-        },
+  return [
+    injected({
+      shimDisconnect: true,
+      unstable_shimAsyncInject: 2_000,
+      target: () => ({
+        id: "injected",
+        name: "Browser wallet",
+        provider: (walletWindow) => walletWindow?.ethereum,
       }),
-    );
-  }
-
-  return connectors;
+    }),
+  ];
 }
 
 function orderedChains(): readonly [SupportedChain, ...SupportedChain[]] {
