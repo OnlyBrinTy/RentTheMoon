@@ -56,7 +56,7 @@ contract MoonLandRegistry is ERC721, ERC721Enumerable, AccessControl, IMoonLandR
 
     /// @inheritdoc IMoonLandRegistry
     function isValidSector(uint256 sectorId) public pure returns (bool) {
-        return sectorId < _TOTAL_SECTORS;
+        return sectorId < _TOTAL_SECTORS && sectorId >= 0;
     }
 
     /// @inheritdoc IMoonLandRegistry
