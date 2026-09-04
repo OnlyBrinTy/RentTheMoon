@@ -28,6 +28,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     uint64 public constant MAX_RENTAL_DAYS = 365;
     /// @notice Seconds in a rental day.
     uint64 public constant SECONDS_PER_DAY = 86_400;
+    /// @notice the conversion rate from the local inflatable currency MUN to ETH (1 ETH = 10 MUN)
+    uint64 public constant MUN_TO_ETH_RATE = 10;
 
     /// @notice Aggregated per-sector state, so the frontend needs one call per sector.
     struct SectorView {
@@ -48,6 +50,9 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         uint256 pricePerDay;
         uint256 salePrice;
     }
+
+    /// @notice the the balances of users in wei of MUN (not Model United Nations)
+    mapping(address sectorId => uint256) public balances;
 
     /// @notice The sector registry this marketplace settles against.
     IMoonLandRegistry public immutable registry;
@@ -86,6 +91,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     event InitialSectorPriceChanged(uint256 newPrice);
     /// @notice Emitted when the admin changed the platform fee.
     event PlatformFeeBpsChanged(uint16 newFeeBps);
+    /// @notice Once a user tops up their balance, this is emmited.
+    event Deposited(address user, uint256 MUN_value);
 
     /// @notice Thrown when a sector id falls outside the lunar grid.
     error InvalidSector(uint256 sectorId);
@@ -140,19 +147,19 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     /// @dev Proceeds accrue to `platformBalance`; any overpayment accrues to the
     ///      caller's `claimableBalance` instead of being refunded inline.
     /// @param sectorId The sector to claim.
-    function acquireSector(uint256 sectorId) external payable nonReentrant {
+    function acquireSector(uint256 sectorId) external nonReentrant {
         if (!registry.isValidSector(sectorId)) revert InvalidSector(sectorId);
         if (registry.exists(sectorId)) revert SectorAlreadyClaimed(sectorId);
 
         uint256 price = initialSectorPrice;
-        if (msg.value < price) revert InsufficientPayment(price, msg.value);
+        uint256 user_balance = balances[msg.sender];
+        if (user_balance < price) revert InsufficientPayment(price, user_balance);
 
-        platformBalance += price;
-        _creditOverpayment(price);
+        balances[msg.sender] -= price;
+        registry.mintSector(sectorId, msg.sender);
 
         emit SectorAcquired(sectorId, msg.sender, price);
 
-        registry.mintSector(sectorId, msg.sender);
     }
 
     /// @notice Sets the daily rental price of a sector.
@@ -258,6 +265,17 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
 
         registry.marketplaceTransfer(sectorId, seller, msg.sender);
     }
+
+    function popUpBalance(address user) external payable nonReentrant {
+        if (user == address(0)) revert ZeroAddress();
+        if (msg.value == 0) revert InsufficientPayment(1, 0);
+   
+        platformBalance += msg.value;
+        balances[user] += msg.value * MUN_TO_ETH_RATE;
+
+        emit Deposited(user, msg.value * MUN_TO_ETH_RATE);
+    }
+
 
     /// @notice Pulls the caller's accrued rental income, sale proceeds and refunds.
     function withdrawRentalIncome() external nonReentrant {
