@@ -1,5 +1,7 @@
 # LunarLease
 
+**This is my pet-project about blockchain-based ownership transfer. It's based on Polygon's testnet called Amoy.**
+
 Decentralized virtual lunar real estate on Polygon. Acquire unclaimed sectors of
 the Moon as ERC-721 tokens, rent them out with ERC-4907 temporary usage rights,
 and trade them on a POL-denominated secondary market — all explored through an
