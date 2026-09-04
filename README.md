@@ -1,15 +1,13 @@
 # LunarLease
 
-**This is my pet-project about blockchain-based ownership transfer.**
 
-Decentralized virtual lunar real estate on Polygon. Acquire unclaimed sectors of
-the Moon as ERC-721 tokens, rent them out with ERC-4907 temporary usage rights,
+I made a decentralized virtual lunar real estate on Polygon. Buy sectors of
+the Moon as ERC-721 NFTs, rent them out with ERC-4907 temporary usage rights,
 and trade them on a POL-denominated secondary market — all explored through an
 interactive 3D Moon.
 
-> **Legal notice.** Lunar sectors represent virtual ownership within the
-> LunarLease system. They do **not** represent legally recognized ownership of
-> physical lunar territory.
+
+![LunarLease 3D Moon dashboard — sector grid with unclaimed, owned, rented, and for-sale states](docs/assets/2026-09-04-19.03.55.jpg)
 
 ## Repository layout
 
