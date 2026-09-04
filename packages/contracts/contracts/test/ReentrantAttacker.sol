@@ -36,7 +36,8 @@ contract ReentrantAttacker {
     /// @notice Acquires a sector, overpaying so the attacker accrues a claimable balance.
     /// @param sectorId The sector to acquire.
     function acquire(uint256 sectorId) external payable {
-        marketplace.acquireSector{value: msg.value}(sectorId);
+        marketplace.popUpBalance{value: msg.value}(address(this));
+        marketplace.acquireSector(sectorId);
     }
 
     /// @notice Starts the attack by pulling the attacker's claimable balance.

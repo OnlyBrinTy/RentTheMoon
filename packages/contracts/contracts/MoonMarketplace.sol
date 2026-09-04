@@ -93,6 +93,8 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     event PlatformFeeBpsChanged(uint16 newFeeBps);
     /// @notice Once a user tops up their balance, this is emmited.
     event Deposited(address user, uint256 MUN_value);
+    /// @notice Emmited once a user sends MUN to another user.
+    event Sent(address from, address to, uint256 amount_MUN);
 
     /// @notice Thrown when a sector id falls outside the lunar grid.
     error InvalidSector(uint256 sectorId);
@@ -189,7 +191,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     ///      only the ERC-4907 assignment leaves this contract.
     /// @param sectorId The sector to rent.
     /// @param numberOfDays Rental length in days, within `[1, 365]`.
-    function rentSector(uint256 sectorId, uint64 numberOfDays) external payable nonReentrant {
+    function rentSector(uint256 sectorId, uint64 numberOfDays) external nonReentrant {
         if (!registry.exists(sectorId)) revert SectorNotMinted(sectorId);
         if (numberOfDays < MIN_RENTAL_DAYS || numberOfDays > MAX_RENTAL_DAYS) revert InvalidDuration(numberOfDays);
 
@@ -201,12 +203,14 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         if (registry.userExpires(sectorId) >= block.timestamp) revert AlreadyRented(sectorId);
 
         uint256 totalPrice = config.pricePerDay * numberOfDays;
-        if (msg.value < totalPrice) revert InsufficientPayment(totalPrice, msg.value);
+        uint256 userBalance = balances[msg.sender];
+        if (userBalance < totalPrice) revert InsufficientPayment(totalPrice, userBalance);
+
+        balances[msg.sender] -= totalPrice;
 
         uint64 expiresAt = uint64(block.timestamp) + numberOfDays * SECONDS_PER_DAY;
 
         _splitProceeds(owner, totalPrice);
-        _creditOverpayment(totalPrice);
 
         emit SectorRented(sectorId, msg.sender, expiresAt, totalPrice);
 
@@ -244,7 +248,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     /// @dev Refused while usage rights are still held, so a sale never carries
     ///      an active rental across an ownership change.
     /// @param sectorId The listed sector to buy.
-    function buyListedSector(uint256 sectorId) external payable nonReentrant {
+    function buyListedSector(uint256 sectorId) external nonReentrant {
         SectorConfig storage config = _configs[sectorId];
         if (!config.saleEnabled) revert NotListed(sectorId);
 
@@ -253,13 +257,15 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         if (registry.userExpires(sectorId) >= block.timestamp) revert SectorCurrentlyRented(sectorId);
 
         uint256 price = config.salePrice;
-        if (msg.value < price) revert InsufficientPayment(price, msg.value);
+        uint256 userBalance = balances[msg.sender];
+        if (userBalance < price) revert InsufficientPayment(price, userBalance);
+
+        balances[msg.sender] -= price;
 
         config.saleEnabled = false;
         config.salePrice = 0;
 
         _splitProceeds(seller, price);
-        _creditOverpayment(price);
 
         emit SectorSold(sectorId, seller, msg.sender, price);
 
@@ -276,6 +282,18 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
         emit Deposited(user, msg.value * MUN_TO_ETH_RATE);
     }
 
+
+    function sendMUN(address to, uint256 amount_MUN) external nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount_MUN == 0) revert InsufficientPayment(1, 0);
+        uint256 userBalance = balances[msg.sender];
+        if (userBalance < amount_MUN) revert InsufficientPayment(amount_MUN, userBalance);
+
+        balances[msg.sender] -= amount_MUN;
+        balances[to] += amount_MUN;
+
+        emit Sent(msg.sender, to, amount_MUN);
+    }
 
     /// @notice Pulls the caller's accrued rental income, sale proceeds and refunds.
     function withdrawRentalIncome() external nonReentrant {
@@ -363,12 +381,7 @@ contract MoonMarketplace is AccessControl, ReentrancyGuard {
     function _splitProceeds(address beneficiary, uint256 total) private {
         uint256 fee = (total * platformFeeBps) / BPS_DENOMINATOR;
 
-        platformBalance += fee;
-        claimableBalance[beneficiary] += total - fee;
-    }
-
-    function _creditOverpayment(uint256 charged) private {
-        uint256 overpayment = msg.value - charged;
-        if (overpayment != 0) claimableBalance[msg.sender] += overpayment;
+        balances[address(this)] += fee;
+        balances[beneficiary] += total - fee;
     }
 }
